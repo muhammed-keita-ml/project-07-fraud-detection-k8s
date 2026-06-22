@@ -1,0 +1,67 @@
+# k8s/deployment.yaml
+# Kubernetes Deployment for the fraud detection API
+# Validated on Minikube v1.38.1 / kubectl v1.34.1
+#
+# Apply with: kubectl apply -f k8s/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-detection-api
+  namespace: default
+  labels:
+    app: fraud-detection-api
+    version: "1.0.0"
+    project: project-07
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fraud-detection-api
+  template:
+    metadata:
+      labels:
+        app: fraud-detection-api
+        version: "1.0.0"
+      annotations:
+        # Prometheus auto-discovery — scrape this pod's /metrics endpoint
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: fraud-detection-api
+          image: 597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: fraud-detection-config
+            - secretRef:
+                name: fraud-detection-secrets
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      terminationGracePeriodSeconds: 30

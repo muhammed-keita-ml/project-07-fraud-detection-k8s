@@ -1,0 +1,112 @@
+# k8s/service.yaml
+# Kubernetes Service — exposes the fraud detection API within the cluster
+# and via NodePort for local Minikube access
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-detection-api
+  namespace: default
+  labels:
+    app: fraud-detection-api
+spec:
+  selector:
+    app: fraud-detection-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8000
+      nodePort: 30080
+  type: NodePort
+
+---
+# k8s/configmap.yaml
+# Non-sensitive configuration — safe to commit
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fraud-detection-config
+  namespace: default
+data:
+  DAGSHUB_USERNAME: "muhammed-keita-ml"
+  DAGSHUB_REPO: "project-06-fraud-detection-pipeline"
+  MLFLOW_MODEL_NAME: "fraud-xgboost-class-weighted"
+  MLFLOW_MODEL_STAGE: "Production"
+  AWS_REGION: "eu-west-1"
+
+---
+# k8s/secret-template.yaml
+# Sensitive credentials — populated from .env at deploy time
+# DO NOT commit actual values — this template shows the structure only
+# Apply with: kubectl create secret generic fraud-detection-secrets \
+#   --from-literal=DAGSHUB_TOKEN=<your_token>
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fraud-detection-secrets
+  namespace: default
+type: Opaque
+stringData:
+  DAGSHUB_TOKEN: "REPLACE_WITH_ACTUAL_TOKEN"
+
+---
+# k8s/hpa.yaml
+# Horizontal Pod Autoscaler — scale between 2 and 5 replicas
+# based on CPU utilisation (target 70%)
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: fraud-detection-api-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: fraud-detection-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# k8s/ingress.yaml
+# Nginx Ingress — routes external traffic to the fraud detection service
+# Enable on Minikube with: minikube addons enable ingress
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fraud-detection-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: fraud-detection.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: fraud-detection-api
+                port:
+                  number: 80
