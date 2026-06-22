@@ -193,4 +193,4 @@ Kubernetes, Minikube, Prometheus, Grafana, GitHub Actions, pytest
 - **ECR Repository**: 597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api
 
 ## Status
-In progress — FastAPI + Docker + Kubernetes phase
+In progress — Docker image building via GitHub Actions CI/CD → ECR push
