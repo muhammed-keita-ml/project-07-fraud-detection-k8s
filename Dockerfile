@@ -26,7 +26,7 @@ FROM python:3.11-slim AS runtime
 WORKDIR /app
 
 # Non-root user — security best practice for production containers
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN groupadd -r appuser && useradd -r -g appuser -m -d /home/appuser appuser
 
 # Copy installed packages from builder stage
 COPY --from=builder /install /usr/local
