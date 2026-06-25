@@ -99,23 +99,48 @@ def load_from_registry() -> bool:
         logger.info("Downloading artifact from run %s: %s", run_id, artifact_path)
 
         # Download artifact to a controlled local path and load with XGBoost
-        # native API — avoids the Windows temp path scheme bug in MLflow
+        # native API — avoids path scheme issues in MLflow
         import tempfile, shutil
         tmp_dir = tempfile.mkdtemp()
         try:
             local_path = client.download_artifacts(run_id, artifact_path, tmp_dir)
+            logger.info("Artifact downloaded to: %s", local_path)
             loaded = xgb.XGBClassifier()
             loaded.load_model(local_path)
             model = loaded
+            logger.info("XGBoost model loaded from artifact")
+        except Exception as load_err:
+            logger.warning("Artifact load failed: %s", load_err)
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return False
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
+        # Load scaler and feature columns — from local artifacts if available,
+        # otherwise use defaults that work for the standard ULB dataset schema
         if LOCAL_SCALER_PATH.exists():
             scaler = joblib.load(LOCAL_SCALER_PATH)
             feature_columns = json.loads(LOCAL_FEATURES_PATH.read_text())
-            model_source = f"mlflow_registry:{model_name}/{model_stage}"
-            logger.info("Model loaded from Registry, scaler from local artifacts")
-            return True
+            logger.info("Scaler loaded from local artifacts")
+        else:
+            # In containerized deployments without local model files,
+            # use a fresh scaler fitted on typical ULB dataset statistics
+            # and the standard feature column order
+            from sklearn.preprocessing import StandardScaler
+            import numpy as np
+            default_scaler = StandardScaler()
+            # Fit on approximate ULB dataset statistics for Time and Amount
+            default_scaler.mean_ = np.array([94813.86, 88.35])
+            default_scaler.scale_ = np.array([47488.15, 250.12])
+            default_scaler.var_ = np.array([47488.15**2, 250.12**2])
+            default_scaler.n_features_in_ = 2
+            scaler = default_scaler
+            feature_columns = ["Time"] + [f"V{i}" for i in range(1, 29)] + ["Amount"]
+            logger.info("Using default scaler statistics (no local scaler found)")
+
+        model_source = f"mlflow_registry:{model_name}/{model_stage}"
+        logger.info("Model loaded from Registry, scaler ready")
+        return True
 
     except Exception as e:
         logger.warning("Registry load failed: %s", e)
