@@ -24,14 +24,15 @@ Docker Container (multi-stage, non-root user)
         ↓
 AWS ECR (597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api)
         ↓
-┌─────────────────────────┬────────────────────────┐
-│     Minikube (local)    │     AWS EC2 (cloud)    │
-│  Deployment (2 replicas)│  Docker run from ECR   │
-│  Service (NodePort)     │  Free tier eligible    │
-│  Ingress (nginx)        │  Same image, validated │
-│  HPA (cpu 70%)          │  locally first         │
-│  ConfigMap + Secret     │                        │
-└─────────────────────────┴────────────────────────┘
+┌────────────────────────────────────────┐
+│           AWS EC2 (cloud)              │
+│  Instance: t3.micro · eu-west-1        │
+│  Docker container running from ECR     │
+│  Live: http://108.129.180.68:8000      │
+│                                        │
+│  K8s manifests validated (6 resources) │
+│  Ready for EKS deployment              │
+└────────────────────────────────────────┘
         ↓
 Prometheus + Grafana
   prediction latency · request rate
@@ -193,4 +194,11 @@ Kubernetes, Minikube, Prometheus, Grafana, GitHub Actions, pytest
 - **ECR Repository**: 597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api
 
 ## Status
-In progress — Docker image building via GitHub Actions CI/CD → ECR push
+Live on AWS EC2. API endpoint: http://108.129.180.68:8000
+
+## Links
+- **GitHub**: https://github.com/muhammed-keita-ml/project-07-fraud-detection-k8s
+- **Live API**: http://108.129.180.68:8000/docs
+- **ECR Repository**: 597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api
+- **Project 06**: https://github.com/muhammed-keita-ml/project-06-fraud-detection-pipeline
+- **DagsHub / MLflow**: https://dagshub.com/muhammed-keita-ml/project-06-fraud-detection-pipeline
