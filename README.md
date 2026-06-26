@@ -28,7 +28,7 @@ AWS ECR (597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api)
 │           AWS EC2 (cloud)              │
 │  Instance: t3.micro · eu-west-1        │
 │  Docker container running from ECR     │
-│  Live: http://108.129.180.68:8000      │
+│  Live: http://108.128.140.230:8000      │
 │                                        │
 │  K8s manifests validated (6 resources) │
 │  Ready for EKS deployment              │
@@ -180,7 +180,7 @@ with both `latest` and commit SHA tags.
 
 ## Roadmap
 - **Project 06**: Model training + MLflow + imbalance strategy comparison ✅
-- **Project 07** (this repo): Cloud deployment + Kubernetes + monitoring
+- **Project 07** (this repo): Cloud deployment + Kubernetes + monitoring  ✅
 - **Project 08 (FRIP)**: Capstone — fraud detection + credit scoring +
   monitoring as a unified multi-model platform
 
@@ -194,11 +194,11 @@ Kubernetes, Minikube, Prometheus, Grafana, GitHub Actions, pytest
 - **ECR Repository**: 597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api
 
 ## Status
-Live on AWS EC2. API endpoint: http://108.129.180.68:8000
+Live on AWS EC2. API endpoint: http://108.128.140.230:8000
 
 ## Links
 - **GitHub**: https://github.com/muhammed-keita-ml/project-07-fraud-detection-k8s
-- **Live API**: http://108.129.180.68:8000/docs
+- **Live API**: http://108.128.140.230:8000/docs
 - **ECR Repository**: 597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api
 - **Project 06**: https://github.com/muhammed-keita-ml/project-06-fraud-detection-pipeline
 - **DagsHub / MLflow**: https://dagshub.com/muhammed-keita-ml/project-06-fraud-detection-pipeline
