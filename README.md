@@ -193,6 +193,19 @@ Kubernetes, Minikube, Prometheus, Grafana, GitHub Actions, pytest
 - **DagsHub**: https://dagshub.com/muhammed-keita-ml/project-06-fraud-detection-pipeline
 - **ECR Repository**: 597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api
 
+## Model Registry
+
+This service loads its model from the MLflow Model Registry in the
+Project 06 repository — the deployment repo and the model repo are
+intentionally separate, following the principle that model versioning
+and infrastructure versioning should be independent.
+
+- **Registry**: https://dagshub.com/muhammed-keita-ml/project-06-fraud-detection-pipeline
+- **Model name**: fraud-xgboost-class-weighted
+- **Stage**: Production
+- **Version**: 1
+- **Trained in**: [Project 06 — Credit Card Fraud Detection Pipeline](https://github.com/muhammed-keita-ml/project-06-fraud-detection-pipeline)
+
 ## Status
 Live on AWS EC2. API endpoint: http://108.128.140.230:8000
 
