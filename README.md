@@ -192,6 +192,7 @@ Kubernetes, Minikube, Prometheus, Grafana, GitHub Actions, pytest
 - **Project 06**: https://github.com/muhammed-keita-ml/project-06-fraud-detection-pipeline
 - **DagsHub**: https://dagshub.com/muhammed-keita-ml/project-06-fraud-detection-pipeline
 - **ECR Repository**: 597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api
+- **Medium**: https://medium.com/@mkeitaone/from-model-to-production-what-building-a-cloud-native-fraud-detection-api-revealed-about-ml-e7c1f655e072
 
 ## Model Registry
 
