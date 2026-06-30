@@ -1,4 +1,5 @@
 # Project 07 — Fraud Detection: Cloud-Native Deployment + Kubernetes
+[**Technical Report**](./project07_technical_report.md) — Full methodology, results, and research directions
 
 ## Overview
 Production-grade cloud-native deployment of the winning fraud detection
