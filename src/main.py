@@ -149,10 +149,8 @@ def load_from_registry() -> bool:
 
         if artifact_path == source and source.startswith("runs:/"):
             artifact_path = source.rsplit("/", 1)[-1]
-            
             if not artifact_path or artifact_path.startswith("runs:/"):
                 raise ValueError(f"Could not extract model artifact path from: {source}")
-            
         logger.info(
             "Loading model and preprocessing artifacts from run %s",
             run_id,
