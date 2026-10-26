@@ -1,3 +1,4 @@
+
 """Tests for Project 07 FastAPI inference service.
 
 Run with: pytest tests/ -v
@@ -8,7 +9,7 @@ suite runs in CI without needing the full model artifacts.
 """
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -47,31 +48,42 @@ def make_mock_scaler():
 def client():
     """FastAPI test client with mocked model and scaler."""
     import src.main as main_module
+
     main_module.model = make_mock_model(proba=0.05)
     main_module.scaler = make_mock_scaler()
     main_module.feature_columns = FEATURE_COLUMNS
     main_module.model_source = "mock:test"
 
     from src.main import app
+
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
-    # Reset after test
+
     main_module.model = None
+    main_module.scaler = None
+    main_module.feature_columns = None
+    main_module.model_source = None
 
 
 @pytest.fixture
 def fraud_client():
     """FastAPI test client mocked to return high fraud probability."""
     import src.main as main_module
+
     main_module.model = make_mock_model(proba=0.95)
     main_module.scaler = make_mock_scaler()
     main_module.feature_columns = FEATURE_COLUMNS
     main_module.model_source = "mock:test"
 
     from src.main import app
+
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
+
     main_module.model = None
+    main_module.scaler = None
+    main_module.feature_columns = None
+    main_module.model_source = None
 
 
 @pytest.fixture
@@ -80,20 +92,36 @@ def no_model_client():
     import src.main as main_module
 
     from src.main import app
+
     with TestClient(app, raise_server_exceptions=False) as c:
-        # Set model to None AFTER startup so the lifespan doesn't reload it
-        original_model = main_module.model
+        # Set model to None AFTER startup so the lifespan doesn't reload it.
+        original_state = (
+            main_module.model,
+            main_module.scaler,
+            main_module.feature_columns,
+            main_module.model_source,
+        )
+
         main_module.model = None
+        main_module.scaler = None
+        main_module.feature_columns = None
         main_module.model_source = None
+
         yield c
-        # Restore after test
-        main_module.model = original_model
+
+        (
+            main_module.model,
+            main_module.scaler,
+            main_module.feature_columns,
+            main_module.model_source,
+        ) = original_state
 
 
 class TestRootEndpoint:
     def test_root_returns_service_info(self, client):
         response = client.get("/")
         assert response.status_code == 200
+
         data = response.json()
         assert data["service"] == "Fraud Detection API"
         assert "predict" in data["endpoints"]
@@ -105,6 +133,7 @@ class TestHealthEndpoint:
     def test_health_returns_healthy(self, client):
         response = client.get("/health")
         assert response.status_code == 200
+
         data = response.json()
         assert data["status"] == "healthy"
         assert data["model_loaded"] is True
@@ -118,6 +147,7 @@ class TestPredictEndpoint:
     def test_predict_legitimate_transaction(self, client):
         response = client.post("/predict", json=SAMPLE_TRANSACTION)
         assert response.status_code == 200
+
         data = response.json()
         assert data["prediction"] == "legitimate"
         assert data["fraud_probability"] < 0.5
@@ -128,6 +158,7 @@ class TestPredictEndpoint:
     def test_predict_fraudulent_transaction(self, fraud_client):
         response = fraud_client.post("/predict", json=SAMPLE_TRANSACTION)
         assert response.status_code == 200
+
         data = response.json()
         assert data["prediction"] == "fraud"
         assert data["fraud_probability"] > 0.5
@@ -143,7 +174,9 @@ class TestPredictEndpoint:
         assert response.status_code == 422
 
     def test_predict_rejects_missing_field(self, client):
-        incomplete = {k: v for k, v in SAMPLE_TRANSACTION.items() if k != "V1"}
+        incomplete = {
+            k: v for k, v in SAMPLE_TRANSACTION.items() if k != "V1"
+        }
         response = client.post("/predict", json=incomplete)
         assert response.status_code == 422
 
@@ -156,9 +189,12 @@ class TestPredictEndpoint:
             (0.45, "low"),
         ]:
             main_module.model = make_mock_model(proba=proba)
+
             from src.main import app
+
             with TestClient(app) as c:
                 response = c.post("/predict", json=SAMPLE_TRANSACTION)
+                assert response.status_code == 200
                 assert response.json()["confidence"] == expected_confidence
 
 
@@ -166,6 +202,159 @@ class TestMetricsEndpoint:
     def test_metrics_returns_prometheus_format(self, client):
         client.post("/predict", json=SAMPLE_TRANSACTION)
         response = client.get("/metrics")
+
         assert response.status_code == 200
         assert b"fraud_predictions_total" in response.content
         assert b"fraud_prediction_latency_seconds" in response.content
+
+
+class TestRegistryArtifactLoading:
+    def test_registry_loads_all_artifacts_from_same_run(
+        self, monkeypatch, tmp_path
+    ):
+        import src.main as main_module
+
+        run_id = "test-run-123"
+        requested_artifacts = []
+
+        class FakeVersion:
+            source = (
+                "https://example.test/artifacts/"
+                "fraud_xgboost_class_weighted.json"
+            )
+
+            def __init__(self):
+                self.run_id = run_id
+
+        class FakeClient:
+            def get_latest_versions(self, model_name, stages):
+                assert model_name == "fraud-xgboost-class-weighted"
+                assert stages == ["Production"]
+                return [FakeVersion()]
+
+            def download_artifacts(self, requested_run_id, path, dst_path):
+                requested_artifacts.append((requested_run_id, path))
+
+                if requested_run_id != run_id:
+                    raise AssertionError("Artifact run ID mismatch")
+
+                if path.endswith(".json") and path != "feature_columns.json":
+                    artifact_path = tmp_path / "model.json"
+                    artifact_path.write_text("fake model", encoding="utf-8")
+                    return str(artifact_path)
+
+                if path == "scaler.joblib":
+                    artifact_path = tmp_path / "scaler.joblib"
+                    artifact_path.write_text("fake scaler", encoding="utf-8")
+                    return str(artifact_path)
+
+                if path == "feature_columns.json":
+                    artifact_path = tmp_path / "feature_columns.json"
+                    artifact_path.write_text(
+                        json.dumps(FEATURE_COLUMNS), encoding="utf-8"
+                    )
+                    return str(artifact_path)
+
+                raise AssertionError(f"Unexpected artifact path: {path}")
+
+        class FakeModel:
+            def load_model(self, path):
+                assert path.endswith("model.json")
+
+        class FakeScaler:
+            n_features_in_ = 2
+
+            def transform(self, values):
+                return values
+
+        monkeypatch.setenv("DAGSHUB_TOKEN", "test-token")
+        monkeypatch.setattr("dagshub.auth.add_app_token", lambda token: None)
+        monkeypatch.setattr("dagshub.init", lambda **kwargs: None)
+        monkeypatch.setattr(
+            main_module.mlflow.tracking,
+            "MlflowClient",
+            FakeClient,
+        )
+        monkeypatch.setattr(main_module.xgb, "XGBClassifier", FakeModel)
+        monkeypatch.setattr(
+            main_module.joblib,
+            "load",
+            lambda path: FakeScaler()
+            if str(path).endswith("scaler.joblib")
+            else pytest.fail(f"Unexpected joblib path: {path}"),
+        )
+
+        main_module.model = None
+        main_module.scaler = None
+        main_module.feature_columns = None
+        main_module.model_source = None
+
+        assert main_module.load_from_registry() is True
+        assert requested_artifacts == [
+            (run_id, "fraud_xgboost_class_weighted.json"),
+            (run_id, "scaler.joblib"),
+            (run_id, "feature_columns.json"),
+        ]
+        assert main_module.model is not None
+        assert main_module.scaler is not None
+        assert main_module.feature_columns == FEATURE_COLUMNS
+        assert run_id in main_module.model_source
+
+    def test_missing_registry_artifact_does_not_partially_load_model(
+        self, monkeypatch, tmp_path
+    ):
+        import src.main as main_module
+
+        run_id = "test-run-456"
+
+        class FakeVersion:
+            source = (
+                "runs:/test-run-456/"
+                "fraud_xgboost_class_weighted.json"
+            )
+
+            def __init__(self):
+                self.run_id = run_id
+
+        class FakeClient:
+            def get_latest_versions(self, model_name, stages):
+                return [FakeVersion()]
+
+            def download_artifacts(self, requested_run_id, path, dst_path):
+                if requested_run_id != run_id:
+                    raise AssertionError("Artifact run ID mismatch")
+
+                if path == "fraud_xgboost_class_weighted.json":
+                    artifact_path = tmp_path / "model.json"
+                    artifact_path.write_text("fake model", encoding="utf-8")
+                    return str(artifact_path)
+
+                if path == "scaler.joblib":
+                    raise FileNotFoundError("scaler artifact missing")
+
+                raise AssertionError(f"Unexpected artifact: {path}")
+
+        class FakeModel:
+            def load_model(self, path):
+                pass
+
+        monkeypatch.setenv("DAGSHUB_TOKEN", "test-token")
+        monkeypatch.setattr("dagshub.auth.add_app_token", lambda token: None)
+        monkeypatch.setattr("dagshub.init", lambda **kwargs: None)
+        monkeypatch.setattr(
+            main_module.mlflow.tracking,
+            "MlflowClient",
+            FakeClient,
+        )
+        monkeypatch.setattr(main_module.xgb, "XGBClassifier", FakeModel)
+
+        main_module.model = None
+        main_module.scaler = None
+        main_module.feature_columns = None
+        main_module.model_source = None
+
+        assert main_module.load_from_registry() is False
+        assert main_module.model is None
+        assert main_module.scaler is None
+        assert main_module.feature_columns is None
+        assert main_module.model_source is None
