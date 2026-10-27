@@ -279,14 +279,35 @@ A testing challenge arose from the interaction between FastAPI's lifespan handle
 The relevant fixture pattern is to establish the client context first and then set the module-level model state for the test:
 
 ```python
+
 @pytest.fixture
 def no_model_client():
+    import src.main as main_module
     from src.main import app
+
     with TestClient(app, raise_server_exceptions=False) as c:
-        original_model = main_module.model
-        main_module.model = None
-        yield c
-        main_module.model = original_model
+        original_state = (
+            main_module.model,
+            main_module.scaler,
+            main_module.feature_columns,
+            main_module.model_source,
+        )
+
+        try:
+            main_module.model = None
+            main_module.scaler = None
+            main_module.feature_columns = None
+            main_module.model_source = None
+
+            yield c
+        finally:
+            (
+                main_module.model,
+                main_module.scaler,
+                main_module.feature_columns,
+                main_module.model_source,
+            ) = original_state
+
 ```
 
 This pattern allows tests to exercise the intended no-model condition after application startup. The exact fixture implementation should remain consistent with the current test module and its imports.
