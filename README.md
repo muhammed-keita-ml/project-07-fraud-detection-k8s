@@ -2,12 +2,12 @@
 [**Technical Report**](./project07_technical_report.md) — Full methodology, results, and research directions
 
 ## Overview
-Production-grade cloud-native deployment of the winning fraud detection
-model from Project 06 (XGBoost + class weighting, PR-AUC 0.880,
-recall@P90 0.837). This project answers the question Project 06 left
-open: how do you deploy a model so it scales, recovers from failures,
-serves predictions reliably, and is observable at the infrastructure
-level — not just the application level?
+Cloud-native deployment of the winning fraud detection model from Project 06
+(XGBoost + class weighting, PR-AUC 0.880, recall@P90 0.837). The repository
+contains a FastAPI inference service, Docker packaging, MLflow Model Registry
+integration, AWS ECR publishing through GitHub Actions, Prometheus metrics,
+and Kubernetes manifests. Claims below distinguish implemented configuration
+from runtime behavior that has not yet been verified.
 
 ## Architecture
 
@@ -29,15 +29,14 @@ AWS ECR (597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api)
 │           AWS EC2 (cloud)              │
 │  Instance: t3.micro · eu-west-1        │
 │  Docker container running from ECR     │
-│  Live: http://108.128.140.230:8000      │
+│  Previously smoke-tested endpoint       │
 │                                        │
-│  K8s manifests validated (6 resources) │
-│  Ready for EKS deployment              │
+│  K8s manifests: 6 resources             │
+│  Configuration-validated only           │
 └────────────────────────────────────────┘
         ↓
-Prometheus + Grafana
-  prediction latency · request rate
-  fraud probability distribution · pod health
+Prometheus instrumentation and local Compose configuration
+  Runtime operation of the full monitoring stack not verified
         ↓
 GitHub Actions CI/CD
   test → build → push to ECR (on push to main)
@@ -115,7 +114,13 @@ docker push \
   597819998212.dkr.ecr.eu-west-1.amazonaws.com/fraud-detection-api:latest
 ```
 
-## Kubernetes Deployment (Minikube)
+## Kubernetes manifests (runtime not yet verified)
+
+The repository includes six Kubernetes resources. The manifests have been
+configuration/YAML-validated, but deployment to a running Minikube or EKS
+cluster has not been verified. The commands below are a deployment procedure,
+not evidence that the deployment has been tested. Local Minikube may also
+require hardware virtualization to be enabled.
 
 ```bash
 # Start Minikube
@@ -158,13 +163,13 @@ curl -X POST http://localhost:8000/predict \
   }'
 ```
 
-Response:
+Example response shape (values and model source vary by request and runtime):
 ```json
 {
   "fraud_probability": 0.023451,
   "prediction": "legitimate",
   "confidence": "high",
-  "model_source": "local:models/fraud_xgboost_class_weighted.json",
+  "model_source": "<loaded model source>",
   "latency_ms": 2.341
 }
 ```
@@ -179,15 +184,18 @@ Required GitHub Secrets:
 On every push to `main`: tests run → Docker image builds → pushes to ECR
 with both `latest` and commit SHA tags.
 
-## Roadmap
-- **Project 06**: Model training + MLflow + imbalance strategy comparison ✅
-- **Project 07** (this repo): Cloud deployment + Kubernetes + monitoring  ✅
+## Project Status
+- **Project 06**: Model training, MLflow, and imbalance strategy comparison completed.
+- **Project 07** (this repo): FastAPI service, registry integration, Docker packaging,
+  AWS ECR CI workflow, Prometheus instrumentation, and Kubernetes manifests are present.
+- Kubernetes cluster runtime and full Prometheus/Grafana stack runtime have not been verified.
+- GitHub Actions builds and pushes images to ECR; it does **not** automatically deploy them to EC2.
 - **Project 08 (FRIP)**: Capstone — fraud detection + credit scoring +
   monitoring as a unified multi-model platform
 
 ## Tech Stack
 FastAPI, Uvicorn, XGBoost, MLflow, DagsHub, Docker, AWS ECR, AWS EC2,
-Kubernetes, Minikube, Prometheus, Grafana, GitHub Actions, pytest
+Kubernetes manifests, Prometheus instrumentation, Docker Compose configuration, GitHub Actions, pytest
 
 ## Links
 - **Project 06**: https://github.com/muhammed-keita-ml/project-06-fraud-detection-pipeline
@@ -205,11 +213,11 @@ and infrastructure versioning should be independent.
 - **Registry**: https://dagshub.com/muhammed-keita-ml/project-06-fraud-detection-pipeline
 - **Model name**: fraud-xgboost-class-weighted
 - **Stage**: Production
-- **Version**: 1
+- **Version/stage**: Production registry reference (the exact resolved model version/run can change; verify the registry before deployment)
 - **Trained in**: [Project 06 — Credit Card Fraud Detection Pipeline](https://github.com/muhammed-keita-ml/project-06-fraud-detection-pipeline)
 
-## Status
-Live on AWS EC2. API endpoint: http://108.128.140.230:8000
+## Deployment Status
+An EC2 endpoint was smoke-tested previously, but current availability and the exact image digest running on EC2 have not been freshly verified. The GitHub Actions workflow publishes images to ECR; EC2 deployment is a separate operation.
 
 ## Links
 - **GitHub**: https://github.com/muhammed-keita-ml/project-07-fraud-detection-k8s
